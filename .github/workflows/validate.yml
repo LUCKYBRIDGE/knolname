@@ -1,0 +1,30 @@
+name: Validate nolsaju
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Ensure generative AI code is absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -RInE '@google/genai|GoogleGenAI|GEMINI_API_KEY|/api/naming/interpret|generateContent\('             --exclude-dir=node_modules --exclude-dir=.git .; then
+            echo "Generative AI dependency or endpoint found." >&2
+            exit 1
+          fi
+      - name: Type check
+        run: npm run lint
+      - name: Build frontend
+        run: npm run build
