@@ -92,6 +92,7 @@ export function NamingStudioPanel({
     recFixedHanja1,
     recFixedHanja2,
     preferredInput,
+    preferredMeaningInput,
     manHangul1,
     manHanja1,
     manHangul2,
@@ -132,6 +133,15 @@ export function NamingStudioPanel({
     }
     return { hangul, hanja };
   }, [preferredInput]);
+
+  const parsedMeaningKeywords = useMemo(
+    () =>
+      preferredMeaningInput
+        .split(/[,·/\n]+/)
+        .map((s) => s.trim())
+        .filter((s, idx, arr) => Boolean(s) && arr.indexOf(s) === idx),
+    [preferredMeaningInput]
+  );
 
   const [pool1, setPool1] = useState<HanjaRecord[]>([]);
   const [pool2, setPool2] = useState<HanjaRecord[]>([]);
@@ -252,6 +262,7 @@ export function NamingStudioPanel({
           override?.preferredHanja !== undefined
             ? override.preferredHanja
             : parsedPreferences.hanja,
+        preferredMeaningKeywords: parsedMeaningKeywords,
         targetElements,
         strokeMethod,
         surnameStrokeCount: surnameStrokeOverride,
@@ -389,6 +400,64 @@ export function NamingStudioPanel({
     onSelectCandidate(item);
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       inspectorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const getSelectedSense = (char: NameEvaluation['characters'][number] | undefined) => {
+    const selectedId = char?.meaningSelection?.selectedSenseIds[0];
+    return char?.readingSenses?.find((sense) => sense.senseId === selectedId) ?? null;
+  };
+
+  const getSelectedMeaningLabel = (
+    char: NameEvaluation['characters'][number] | undefined
+  ) =>
+    getSelectedSense(char)?.rawSense ||
+    char?.meaning.split(',')[0] ||
+    '의미 확인 필요';
+
+  const handleSelectMeaning = async (
+    role: 'given1' | 'given2',
+    senseId: string
+  ) => {
+    if (!selectedCandidate) return;
+
+    const first = selectedCandidate.characters.find((char) => char.role === 'given1');
+    const second = selectedCandidate.characters.find((char) => char.role === 'given2');
+
+    const selectedSenseId1 =
+      role === 'given1'
+        ? senseId
+        : first?.meaningSelection?.selectedSenseIds[0] || null;
+    const selectedSenseId2 =
+      role === 'given2'
+        ? senseId
+        : second?.meaningSelection?.selectedSenseIds[0] || null;
+
+    try {
+      const resp = await fetch('/api/naming/evaluate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          surnameHangul,
+          surnameHanja,
+          surnameStrokeOverride,
+          strokeMethod,
+          hangul1: first?.hangul || '',
+          hanja1: first?.hanja || '',
+          hangul2: second?.hangul || '',
+          hanja2: second?.hanja || '',
+          selectedSenseId1,
+          selectedSenseId2,
+          saju: sajuResult,
+        }),
+      });
+      const data = (await resp.json()) as NameEvaluation & { error?: string };
+      if (!resp.ok) throw new Error(data.error || '작명 뜻 선택을 반영하지 못했습니다.');
+      onSelectCandidate(data);
+    } catch (err) {
+      setRecError(
+        err instanceof Error ? err.message : '작명 뜻 선택을 반영하지 못했습니다.'
+      );
     }
   };
 
