@@ -92,7 +92,7 @@ export function NamingStudioPanel({
     recFixedHanja1,
     recFixedHanja2,
     preferredInput,
-    preferredMeaningInput,
+    preferredMeaningInput = '',
     manHangul1,
     manHanja1,
     manHangul2,
@@ -413,7 +413,7 @@ export function NamingStudioPanel({
   ) => {
     const selected = getSelectedSense(char);
     if (selected) return selected.rawSense;
-    if ((char?.meaningSelection?.selectableSenseIds.length || 0) > 0) {
+    if ((char?.meaningSelection?.selectableSenseIds?.length || 0) > 0) {
       return '작명 뜻 미선택';
     }
     return '작명사전 뜻 미구축';
