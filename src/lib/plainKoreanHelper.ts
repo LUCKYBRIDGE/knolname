@@ -141,25 +141,35 @@ export function buildPlainNameSummary(
   }
 
   // 3. Meaning & Saju Resource Alignment
-  const m1 = candidate.characters[1]?.meaning.split(',')[0] || '의미 확인 필요';
-  const m2 = candidate.characters[2]?.meaning.split(',')[0] || '';
+  const selectedMeaning = (index: 1 | 2) => {
+    const char = candidate.characters[index];
+    const selectedId = char?.meaningSelection?.selectedSenseIds[0];
+    const sense = char?.readingSenses?.find((s) => s.senseId === selectedId);
+    if (sense) return sense.rawSense;
+    if ((char?.meaningSelection?.selectableSenseIds.length || 0) > 0) {
+      return '작명사전 뜻 미선택';
+    }
+    return '작명사전 선택 뜻 미구축';
+  };
+  const m1 = selectedMeaning(1);
+  const m2 = candidate.characters[2]?.hangul ? selectedMeaning(2) : '';
   const meaningJoined = m2 ? `‘${m1}’와 ‘${m2}’` : `‘${m1}’`;
 
   if (saju) {
     if (candidate.resourceAlignment.matchesYongsin) {
       lines.push(
-        `뜻과 사주 보완: ${meaningJoined}의 긍정적 의미를 담고 있으며, 사주 균형에 추천된 ${candidate.resourceAlignment.matchedElements
+        `뜻과 사주 보완: 작명사전에서 선택한 ${meaningJoined}을 중심 뜻으로 삼고, 사주 균형에 추천된 ${candidate.resourceAlignment.matchedElements
           .map((e) => ELEMENT_PLAIN_DESC[e])
           .join('·')} 기운을 한자의 자원오행으로 채워줍니다.`
       );
     } else {
       lines.push(
-        `뜻과 사주 보완: ${meaningJoined}의 뜻을 가지며, 사주 1차 추천 오행(${saju.eokbuYongsinCandidates.join('·')})과는 직접 겹치지 않으니 어감과 뜻의 선호도를 우선으로 함께 살펴보세요.`
+        `뜻과 사주 보완: 작명사전 선택 기준은 ${meaningJoined}이며, 사주 1차 추천 오행(${saju.eokbuYongsinCandidates.join('·')})과는 직접 겹치지 않으니 어감과 뜻의 선호도를 우선으로 함께 살펴보세요.`
       );
     }
   } else {
     lines.push(
-      `한자 의미: 이름자에 ${meaningJoined}의 뜻이 담겨 있습니다. (성씨 ‘${sHangul}’의 사전적 뜻은 이름자 평가 감점에 반영하지 않습니다.)`
+      `한자 의미: 작명사전에서 선택한 중심 뜻은 ${meaningJoined}입니다. (성씨 ‘${sHangul}’의 사전적 뜻은 이름자 평가 감점에 반영하지 않습니다.)`
     );
   }
 
