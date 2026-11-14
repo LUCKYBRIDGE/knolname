@@ -76,11 +76,11 @@ export function RepoSyncPanel({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
-      {/* Left: LUCKYBRIDGE/name Dataset Summary & GitHub Sync */}
+      {/* Left: LUCKYBRIDGE/name Dataset Summary & Static Snapshot */}
       <div className="lg:col-span-6 border border-[#E7E2D8] bg-white rounded-md p-4 sm:p-6 space-y-5">
         <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[#E7E2D8] pb-4">
           <div>
-            <p className="text-xs text-[#78716C]">연동된 원본 저장소</p>
+            <p className="text-xs text-[#78716C]">데이터 원본 저장소</p>
             <h2 className="font-serif-kr text-lg sm:text-xl font-semibold text-[#1C1917] mt-0.5">
               LUCKYBRIDGE/name 데이터셋 현황
             </h2>
@@ -136,7 +136,7 @@ export function RepoSyncPanel({
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 min-h-[44px] sm:min-h-[38px] text-xs font-medium text-white bg-[#1C1917] hover:bg-[#292524] disabled:opacity-60 rounded-sm transition-colors cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin' : ''}`} />
-            {syncing ? 'GitHub에서 최신 데이터 받는 중...' : 'GitHub 저장소에서 최신 기준 다시 불러오기'}
+            {syncing ? '배포 데이터 확인 중...' : '현재 배포 데이터 버전 확인'}
           </button>
           {syncMsg && (
             <div className="p-2.5 text-xs bg-[#ECFDF5] border border-[#A7F3D0] text-[#14532D] rounded-sm">
@@ -154,7 +154,7 @@ export function RepoSyncPanel({
               개별 한자 원획 · 자원오행 사용자 보정
             </h3>
             <p className="text-xs text-[#78716C] mt-0.5">
-              특정 작명 학파나 개인 정리 노트의 원획·자원오행 기준이 기본값과 다를 때 즉시 반영합니다.
+              특정 작명 학파나 개인 정리 노트의 원획·자원오행 기준이 기본값과 다를 때 현재 브라우저 작업에만 반영합니다.
             </p>
           </div>
 
