@@ -60,7 +60,6 @@ export function ComparisonReportPanel({
                   type="button"
                   onClick={() => {
                     onSelectCandidate(cand);
-                    setAiText(null);
                   }}
                   className={`px-3 min-h-[38px] sm:min-h-[32px] text-xs font-medium border rounded-sm transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
                     active
