@@ -716,6 +716,9 @@ export function recommendNamesWithMeta(
 
   const prefHangulSet = new Set<string>(prefHangulList);
   const prefHanjaSet = new Set<string>(prefHanjaList);
+  const preferredMeaningKeywords = (req.preferredMeaningKeywords || [])
+    .map((s) => s.trim())
+    .filter(Boolean);
 
   // Readings implied by preferred Hanja (so '宇' also surfaces '우')
   const prefReadingList: string[] = [...prefHangulList];
@@ -748,7 +751,9 @@ export function recommendNamesWithMeta(
   const slot1Constrained = Boolean(rawH1 || rawC1);
   const slot2Constrained = Boolean(rawH2 || rawC2);
   const hasPreferredConstraint = prefHangulSet.size > 0 || prefHanjaSet.size > 0;
-  const hasAnyUserConstraint = slot1Constrained || slot2Constrained || hasPreferredConstraint;
+  const hasMeaningConstraint = preferredMeaningKeywords.length > 0;
+  const hasAnyUserConstraint =
+    slot1Constrained || slot2Constrained || hasPreferredConstraint || hasMeaningConstraint;
 
   const d1 = rawH1 && rawC1 ? `${rawH1}(${rawC1})` : rawC1 ? `${slot1FixedReadings?.[0] ?? '?'}(${rawC1})` : rawH1 || 'X';
   const d2 = rawH2 && rawC2 ? `${rawH2}(${rawC2})` : rawC2 ? `${slot2FixedReadings?.[0] ?? '?'}(${rawC2})` : rawH2 || 'X';
@@ -844,12 +849,69 @@ export function recommendNamesWithMeta(
     }
   }
 
-  const prioritizePool = (pool: HanjaRecord[], sliceLimit: number) =>
+  const getMeaningPreferenceScore = (rec: HanjaRecord, reading: string): number => {
+    if (preferredMeaningKeywords.length === 0) return 0;
+    const senses = rec.sensesByReading?.[reading] || [];
+    let score = 0;
+
+    for (const keyword of preferredMeaningKeywords) {
+      const matched = senses.filter((sense) => {
+        const haystack = [
+          sense.rawSense,
+          sense.glossCore,
+          sense.editorialGloss || '',
+        ].join(' ');
+        return haystack.includes(keyword);
+      });
+
+      if (matched.length === 0) continue;
+      const best = matched.reduce((bestScore, sense) => {
+        if (
+          sense.senseClass === 'preferred_name_sense' &&
+          sense.recommendedForName !== false
+        ) {
+          return Math.max(bestScore, 24);
+        }
+        if (
+          sense.senseClass === 'usable_name_sense' &&
+          sense.recommendedForName !== false
+        ) {
+          return Math.max(bestScore, 18);
+        }
+        if (
+          sense.senseClass === 'contextual_dictionary_sense' &&
+          sense.recommendedForName !== false
+        ) {
+          return Math.max(bestScore, 8);
+        }
+        if (sense.recommendedForName !== false) {
+          return Math.max(bestScore, 12);
+        }
+        // A documented but cautionary sense may still match the user's word.
+        // It is surfaced, not silently treated as a positive naming meaning.
+        return Math.max(bestScore, 2);
+      }, 0);
+      score += best;
+    }
+
+    return score;
+  };
+
+  const prioritizePool = (
+    pool: HanjaRecord[],
+    sliceLimit: number,
+    reading: string
+  ) =>
     [...pool]
       .sort((a, b) => {
         const aPref = prefHanjaSet.has(a.hanja) ? 1 : 0;
         const bPref = prefHanjaSet.has(b.hanja) ? 1 : 0;
         if (aPref !== bPref) return bPref - aPref;
+
+        const aMeaning = getMeaningPreferenceScore(a, reading);
+        const bMeaning = getMeaningPreferenceScore(b, reading);
+        if (aMeaning !== bMeaning) return bMeaning - aMeaning;
+
         const aMatch = a.resourceElement && targetSet.has(a.resourceElement) ? 1 : 0;
         const bMatch = b.resourceElement && targetSet.has(b.resourceElement) ? 1 : 0;
         if (aMatch !== bMatch) return bMatch - aMatch;
@@ -874,8 +936,8 @@ export function recommendNamesWithMeta(
       const pool2 = getPoolForSyllable(h2, rawC2 || undefined);
       if (pool1.length === 0 || pool2.length === 0) continue;
 
-      const top1 = prioritizePool(pool1, slice1);
-      const top2 = prioritizePool(pool2, slice2);
+      const top1 = prioritizePool(pool1, slice1, h1);
+      const top2 = prioritizePool(pool2, slice2, h2);
 
       for (const c1 of top1) {
         for (const c2 of top2) {
@@ -915,6 +977,21 @@ export function recommendNamesWithMeta(
           if (prefHangulSet.has(h2)) w += 30;
           if (!prefHangulSet.has(h1) && prefAllReadingSet.has(h1)) w += 10;
           if (!prefHangulSet.has(h2) && prefAllReadingSet.has(h2)) w += 10;
+
+          // Meaning preferences are matched only against documented senses for the exact reading.
+          w += getMeaningPreferenceScore(c1, h1);
+          w += getMeaningPreferenceScore(c2, h2);
+
+          const semanticChars = ev.characters.filter((char) => char.role !== 'surname');
+          for (const char of semanticChars) {
+            const selectedId = char.meaningSelection?.selectedSenseIds[0];
+            const selectedSense = char.readingSenses?.find((s) => s.senseId === selectedId);
+            if (selectedSense?.senseClass === 'preferred_name_sense') w += 5;
+            else if (selectedSense?.senseClass === 'usable_name_sense') w += 3;
+            if (char.semanticRiskLevel === 'medium') w -= 2;
+            else if (char.semanticRiskLevel === 'high') w -= 6;
+            else if (char.semanticRiskLevel === 'invalid') w -= 50;
+          }
 
           w += ev.numerology.goodCount * 10;
           w += ev.numerology.grids.filter((g) => g.grade === '대길').length * 3;
