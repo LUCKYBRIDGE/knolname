@@ -291,8 +291,13 @@ export function HanjaDictionaryPanel() {
             {/* Reading-by-Reading Multi-Sense Breakdown */}
             {selected.sensesByReading && Object.keys(selected.sensesByReading).length > 0 && (
               <div className="space-y-2 text-xs border-t border-[#E7E2D8] pt-3">
-                <div className="font-semibold text-[#1C1917]">
-                  독음별 다중의미 (사전 분해 기준)
+                <div>
+                  <div className="font-semibold text-[#1C1917]">
+                    독음별 뜻 · 작명사전 구분
+                  </div>
+                  <p className="text-[11px] text-[#78716C] mt-0.5">
+                    ‘작명사전 선택 가능’으로 표시된 뜻만 이름의 중심 뜻으로 선택할 수 있습니다.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   {Object.entries(selected.sensesByReading).map(([rd, senses]) => (
@@ -308,9 +313,18 @@ export function HanjaDictionaryPanel() {
                             <span className={s.concernLevel ? 'text-[#9A3412] font-medium' : ''}>
                               {s.rawSense}
                             </span>
-                            {s.editorialGloss && (
+                            {s.recommendedForName === true && Boolean(s.senseClass) ? (
+                              <span className="ml-1.5 text-[10px] text-[#14532D] font-medium">
+                                · 작명사전 선택 가능
+                              </span>
+                            ) : (
+                              <span className="ml-1.5 text-[10px] text-[#A8A29E]">
+                                · 일반 사전 참고
+                              </span>
+                            )}
+                            {s.recommendedForName === true && s.editorialGloss && (
                               <span className="block text-[#14532D] pl-3 mt-0.5">
-                                → {s.editorialGloss}
+                                작명 풀이 → {s.editorialGloss}
                               </span>
                             )}
                             {s.concernNote && (
