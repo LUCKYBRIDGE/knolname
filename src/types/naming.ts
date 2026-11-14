@@ -18,6 +18,22 @@ export interface HanjaMeaningSense {
   concernNote?: string;
 }
 
+export type MeaningSelectionOrigin =
+  | 'user_declared'
+  | 'editorial_default_suggestion'
+  | 'historical_record'
+  | 'unknown';
+
+export interface NameMeaningSelection {
+  allSenseIds: string[];
+  selectedSenseIds: string[];
+  selectionOrigin: MeaningSelectionOrigin;
+  namingIntent: string | null;
+  interpretationText: string | null;
+  interpretationStatus: 'editorial_paraphrase_not_dictionary_definition' | null;
+  otherSenseNoticeRequired: boolean;
+}
+
 export interface HanjaRecord {
   hanja: string;
   unicode: string;
@@ -258,8 +274,9 @@ export interface NameCharacterEvaluation {
   legalReadings: string[];
   readingSenses?: HanjaMeaningSense[];
   editorialMeaningGloss?: string | null;
+  meaningSelection?: NameMeaningSelection | null;
   semanticNotice?: string | null;
-  semanticRiskLevel?: 'none' | 'low' | 'medium' | 'high';
+  semanticRiskLevel?: 'none' | 'low' | 'medium' | 'high' | 'invalid';
   tabooWarning: string | null;
   radicalNo: number | null;
 }
@@ -315,6 +332,7 @@ export interface NameCandidateRequest {
   fixedHanja2?: string;
   preferredHangul?: string[];
   preferredHanja?: string[];
+  preferredMeaningKeywords?: string[];
   targetElements: FiveElement[];
   strokeMethod: StrokeMethodId;
   surnameStrokeCount: number | null;
@@ -363,6 +381,7 @@ export interface SavedWorkspaceProfile {
     recFixedHanja1: string;
     recFixedHanja2: string;
     preferredInput: string;
+    preferredMeaningInput: string;
     manHangul1: string;
     manHanja1: string;
     manHangul2: string;
