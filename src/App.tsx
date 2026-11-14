@@ -264,6 +264,7 @@ export default function App() {
         hanja1: currentHanja1,
         hangul2: currentHangul2,
         hanja2: currentHanja2,
+        meaningSelectionPolicy: 'unknown_unless_selected',
         saju: sajuResult,
       }),
       signal: controller.signal,
