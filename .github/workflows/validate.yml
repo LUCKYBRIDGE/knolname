@@ -1,15 +1,20 @@
-name: Validate nolsaju
+name: Validate nolsaju static app
 
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
@@ -19,37 +24,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RInE '@google/genai|GoogleGenAI|GEMINI_API_KEY|/api/naming/interpret|generateContent\(' \
-            server.ts server src package.json; then
+          if grep -RInE '@google/genai|GoogleGenAI|GEMINI_API_KEY|/api/naming/interpret|generateContent\('             server.ts server src package.json; then
             echo "Generative AI dependency or endpoint found." >&2
             exit 1
           fi
-      - name: Type check
-        run: npm run lint
-      - name: Build frontend
-        run: npm run build
-      - name: Backend data-sync smoke test
+      - name: Build current static data snapshot from LUCKYBRIDGE/name
+        run: npm run sync:data
+      - name: Validate snapshot
         shell: bash
         run: |
           set -euo pipefail
-          npm start > /tmp/nolsaju-server.log 2>&1 &
-          pid=$!
-          trap 'kill "$pid" 2>/dev/null || true' EXIT
-
-          ok=0
-          for i in $(seq 1 60); do
-            if curl -fsS http://127.0.0.1:3000/api/meta > /tmp/nolsaju-meta.json 2>/dev/null; then
-              ok=1
-              break
-            fi
-            sleep 1
-          done
-
-          if [ "$ok" -ne 1 ]; then
-            cat /tmp/nolsaju-server.log
-            exit 1
+          test -s public/data/knowledge-base.json
+          node -e "const d=require('./public/data/knowledge-base.json'); if(!Array.isArray(d.hanjaList)||d.hanjaList.length<9000) process.exit(1); if(!Array.isArray(d.surnames)||d.surnames.length<31) process.exit(1); console.log('snapshot', d.hanjaList.length, d.surnames.length)"
+      - name: Type check
+        run: npm run lint
+      - name: Build static frontend
+        run: npm run build
+      - name: Commit refreshed static snapshot
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- public/data/knowledge-base.json; then
+            echo "Static snapshot already current."
+            exit 0
           fi
-
-          grep -q '"hanjaCount"' /tmp/nolsaju-meta.json
-          grep -q '"surnames"' /tmp/nolsaju-meta.json
-          node scripts/semantic-selection-smoke.mjs
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/data/knowledge-base.json
+          git commit -m "data: refresh static knowledge snapshot [skip ci]"
+          git push
