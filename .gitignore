@@ -1,0 +1,6 @@
+node_modules/
+dist/
+data/luckybridge/
+.env*
+!.env.example
+.DS_Store
