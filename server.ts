@@ -142,6 +142,7 @@ async function startServer() {
         hanja2: string;
         selectedSenseId1?: string | null;
         selectedSenseId2?: string | null;
+        meaningSelectionPolicy?: 'suggest_default' | 'unknown_unless_selected';
         saju?: SajuAnalysisResult | null;
       };
       const result = evaluateName(body);
