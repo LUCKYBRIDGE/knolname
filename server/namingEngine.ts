@@ -333,41 +333,31 @@ export function evaluateName(params: {
       };
     }
 
+    // Only senses explicitly registered in the naming dictionary as selectable
+    // (naming-meaning-curated.csv: primary_name_explanation_allowed=true)
+    // may become the intended meaning of a name.
+    const selectableSenses = readingSenses.filter(
+      (s) => s.recommendedForName === true && Boolean(s.senseClass)
+    );
+
     const preferredDefault =
-      readingSenses.find(
-        (s) =>
-          s.senseClass === 'preferred_name_sense' &&
-          s.recommendedForName !== false
-      ) ??
-      readingSenses.find(
-        (s) =>
-          s.senseClass === 'usable_name_sense' &&
-          s.recommendedForName !== false
-      ) ??
-      readingSenses.find(
-        (s) =>
-          s.recommendedForName !== false &&
-          s.senseClass !== 'caution_other_dictionary_sense'
-      ) ??
-      readingSenses[0];
+      selectableSenses.find((s) => s.senseClass === 'preferred_name_sense') ??
+      selectableSenses.find((s) => s.senseClass === 'usable_name_sense') ??
+      selectableSenses[0];
 
     const requestedSense = requestedSenseId
-      ? readingSenses.find((s) => s.senseId === requestedSenseId)
+      ? selectableSenses.find((s) => s.senseId === requestedSenseId)
       : undefined;
 
     const selectedSense = requestedSense ?? preferredDefault;
-    const invalidRequestedSense = Boolean(requestedSenseId && !requestedSense);
+    const invalidRequestedSense = Boolean(
+      requestedSenseId && !requestedSense
+    );
     const selectionOrigin = requestedSense
       ? ('user_declared' as const)
       : selectedSense
       ? ('editorial_default_suggestion' as const)
       : ('unknown' as const);
-
-    const selectedIsCaution = Boolean(
-      selectedSense &&
-        (selectedSense.recommendedForName === false ||
-          selectedSense.senseClass === 'caution_other_dictionary_sense')
-    );
 
     const otherSenses = readingSenses.filter(
       (s) => s.senseId !== selectedSense?.senseId
@@ -384,8 +374,6 @@ export function evaluateName(params: {
 
     const semanticRiskLevel = invalidRequestedSense
       ? ('invalid' as const)
-      : selectedIsCaution
-      ? ('high' as const)
       : mediumOrHighOther
       ? ('medium' as const)
       : lowOther
@@ -400,9 +388,12 @@ export function evaluateName(params: {
     if (invalidRequestedSense) {
       semanticNotice =
         `선택한 의미 ID가 '${rec.hanja}+${hangul}'의 문서화된 의미 목록에 없습니다. 다른 독음의 뜻이나 임의 의미를 결합하지 않고 기본 제안 뜻으로 되돌렸습니다.`;
-    } else if (selectedIsCaution && selectedSense) {
+    } else if (requestedSenseId && !requestedSense) {
       semanticNotice =
-        `선택 뜻 확인: '${selectedSense.rawSense}'은 문서화된 사전 뜻이지만 대표 작명 뜻으로는 주의가 필요한 의미입니다. 선택 자체를 막지는 않되 다른 뜻과 함께 확인하세요.`;
+        '선택 요청한 뜻은 작명사전에서 선택 가능하도록 등록된 뜻이 아닙니다. 일반 사전 뜻은 참고만 가능하며 작명 의도로 선택할 수 없습니다.';
+    } else if (!selectedSense && readingSenses.length > 0) {
+      semanticNotice =
+        '이 한자는 일반 사전 뜻은 확인되지만 현재 작명사전에 선택 가능한 뜻이 등록되어 있지 않습니다. 임의로 좋은 뜻을 만들어 선택하지 않습니다.';
     } else if (mediumOrHighOther) {
       semanticNotice =
         `다중의미 안내: 이 이름에서는 '${selectedLabel}'을 중심 뜻으로 삼았지만, 같은 '${hangul}' 독음에 '${mediumOrHighOther.rawSense}' 뜻도 함께 문서화되어 있습니다. 선택한 뜻이 글자의 다른 사전 뜻을 없애지는 않습니다.`;
@@ -416,6 +407,7 @@ export function evaluateName(params: {
       editorialMeaningGloss: selectedSense?.editorialGloss ?? null,
       meaningSelection: {
         allSenseIds: readingSenses.map((s) => s.senseId),
+        selectableSenseIds: selectableSenses.map((s) => s.senseId),
         selectedSenseIds: selectedSense ? [selectedSense.senseId] : [],
         selectionOrigin,
         namingIntent: interpretationText,
