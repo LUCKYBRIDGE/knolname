@@ -41,6 +41,20 @@ export function ComparisonReportPanel({
     activeCandidate.characters[2]?.semanticNotice,
   ].filter((v): v is string => Boolean(v));
 
+  const namingMeaningLabel = (
+    char: NameEvaluation['characters'][number] | undefined,
+    existingName = false
+  ) => {
+    const selectedId = char?.meaningSelection?.selectedSenseIds?.[0];
+    const selectedSense = char?.readingSenses?.find((sense) => sense.senseId === selectedId);
+    if (selectedSense) return selectedSense.rawSense;
+    if (existingName) return '작명 의도 미확인';
+    if ((char?.meaningSelection?.selectableSenseIds?.length || 0) > 0) {
+      return '작명 뜻 미선택';
+    }
+    return '작명사전 뜻 미구축';
+  };
+
   return (
     <div className="space-y-5 sm:space-y-6">
       {/* Selector strip if user has saved multiple candidates */}
@@ -301,15 +315,15 @@ export function ComparisonReportPanel({
                 <div className="text-[11px] text-[#78716C] mb-0.5">비교 기준</div>
                 <div className="text-[#57534E]">
                   {currentEval
-                    ? `${currentEval.characters[1]?.hanja || ''}(${currentEval.characters[1]?.meaning.split(',')[0] || ''}) · ${currentEval.characters[2]?.hanja || ''}(${currentEval.characters[2]?.meaning.split(',')[0] || ''})`
+                    ? `${currentEval.characters[1]?.hanja || ''}(${namingMeaningLabel(currentEval.characters[1], true)}) · ${currentEval.characters[2]?.hanja || ''}(${namingMeaningLabel(currentEval.characters[2], true)})`
                     : '미입력'}
                 </div>
               </div>
               <div className="p-2.5 bg-[#FFF7ED]/50 rounded-sm">
                 <div className="text-[11px] text-[#9A3412] mb-0.5">선택 후보</div>
                 <div className="text-[#1C1917] font-medium">
-                  {activeCandidate.characters[1]?.hanja}({activeCandidate.characters[1]?.meaning.split(',')[0]}) ·{' '}
-                  {activeCandidate.characters[2]?.hanja}({activeCandidate.characters[2]?.meaning.split(',')[0]})
+                  {activeCandidate.characters[1]?.hanja}({namingMeaningLabel(activeCandidate.characters[1])}) ·{' '}
+                  {activeCandidate.characters[2]?.hanja}({namingMeaningLabel(activeCandidate.characters[2])})
                 </div>
               </div>
             </div>
@@ -392,8 +406,8 @@ export function ComparisonReportPanel({
                   {currentEval ? (
                     <>
                       <div>
-                        {currentEval.characters[1]?.hanja}({currentEval.characters[1]?.meaning.split(',')[0]}) ·{' '}
-                        {currentEval.characters[2]?.hanja}({currentEval.characters[2]?.meaning.split(',')[0]})
+                        {currentEval.characters[1]?.hanja}({namingMeaningLabel(currentEval.characters[1], true)}) ·{' '}
+                        {currentEval.characters[2]?.hanja}({namingMeaningLabel(currentEval.characters[2], true)})
                       </div>
                       <div className="text-[11px] text-[#78716C] mt-0.5">
                         {currentEval.usability.legalStatusLabel}
@@ -405,8 +419,8 @@ export function ComparisonReportPanel({
                 </td>
                 <td className="py-3 px-4 text-[#1C1917]">
                   <div>
-                    {activeCandidate.characters[1]?.hanja}({activeCandidate.characters[1]?.meaning.split(',')[0]}) ·{' '}
-                    {activeCandidate.characters[2]?.hanja}({activeCandidate.characters[2]?.meaning.split(',')[0]})
+                    {activeCandidate.characters[1]?.hanja}({namingMeaningLabel(activeCandidate.characters[1])}) ·{' '}
+                    {activeCandidate.characters[2]?.hanja}({namingMeaningLabel(activeCandidate.characters[2])})
                   </div>
                   <div className="text-[11px] text-[#14532D] mt-0.5">
                     {activeCandidate.usability.legalStatusLabel}
