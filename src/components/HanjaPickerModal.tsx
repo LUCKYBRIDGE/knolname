@@ -348,9 +348,11 @@ export function HanjaPickerModal({
                   reading.trim() && item.legalReadings.includes(reading.trim())
                     ? reading.trim()
                     : item.legalReadings[0] || '';
-                const readingSenses = item.sensesByReading?.[displayReading];
-                const curatedPositive = readingSenses?.find((s) => s.recommendedForName && s.editorialGloss);
-                const cautionSense = readingSenses?.find(
+                const readingSenses = item.sensesByReading?.[displayReading] || [];
+                const namingSenses = readingSenses.filter(
+                  (s) => s.recommendedForName === true && Boolean(s.senseClass)
+                );
+                const cautionSense = readingSenses.find(
                   (s) => s.concernLevel === 'medium' || s.concernLevel === 'high'
                 );
                 const meaningForReading =
@@ -401,13 +403,17 @@ export function HanjaPickerModal({
                         </div>
                       </div>
 
-                      <p className="text-xs text-[#57534E] leading-relaxed break-keep">
-                        {meaningForReading}
+                      <p className="text-[11px] text-[#78716C] leading-relaxed break-keep">
+                        일반 사전: {meaningForReading}
                       </p>
 
-                      {curatedPositive?.editorialGloss && (
+                      {namingSenses.length > 0 ? (
                         <p className="text-[11px] text-[#14532D] leading-snug">
-                          작명 뜻: {curatedPositive.editorialGloss}
+                          작명사전 선택 가능: {namingSenses.map((s) => s.rawSense).join(' · ')}
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-[#78716C] leading-snug">
+                          작명사전 선택 뜻 미구축
                         </p>
                       )}
 
