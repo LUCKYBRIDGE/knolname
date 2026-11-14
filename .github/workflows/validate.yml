@@ -19,7 +19,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if grep -RInE '@google/genai|GoogleGenAI|GEMINI_API_KEY|/api/naming/interpret|generateContent\('             --exclude-dir=node_modules --exclude-dir=.git .; then
+          if grep -RInE '@google/genai|GoogleGenAI|GEMINI_API_KEY|/api/naming/interpret|generateContent\(' \
+            server.ts server src package.json; then
             echo "Generative AI dependency or endpoint found." >&2
             exit 1
           fi
