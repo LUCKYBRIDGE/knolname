@@ -246,6 +246,7 @@ export function evaluateName(params: {
   hanja2: string;
   selectedSenseId1?: string | null;
   selectedSenseId2?: string | null;
+  meaningSelectionPolicy?: 'suggest_default' | 'unknown_unless_selected';
   saju?: SajuAnalysisResult | null;
 }): NameEvaluation {
   const kb = getKnowledgeBase();
@@ -309,7 +310,8 @@ export function evaluateName(params: {
   const buildGivenSemantics = (
     rec: HanjaRecord | null,
     hangul: string,
-    requestedSenseId?: string | null
+    requestedSenseId?: string | null,
+    selectionPolicy: 'suggest_default' | 'unknown_unless_selected' = 'suggest_default'
   ) => {
     if (!rec || !hangul) {
       return {
@@ -345,14 +347,17 @@ export function evaluateName(params: {
       selectableSenses.find((s) => s.senseClass === 'usable_name_sense') ??
       selectableSenses[0];
 
+    const requestedAnySense = requestedSenseId
+      ? readingSenses.find((s) => s.senseId === requestedSenseId)
+      : undefined;
     const requestedSense = requestedSenseId
       ? selectableSenses.find((s) => s.senseId === requestedSenseId)
       : undefined;
 
-    const selectedSense = requestedSense ?? preferredDefault;
-    const invalidRequestedSense = Boolean(
-      requestedSenseId && !requestedSense
-    );
+    const selectedSense =
+      requestedSense ??
+      (selectionPolicy === 'suggest_default' ? preferredDefault : undefined);
+    const invalidRequestedSense = Boolean(requestedSenseId && !requestedSense);
     const selectionOrigin = requestedSense
       ? ('user_declared' as const)
       : selectedSense
@@ -386,11 +391,16 @@ export function evaluateName(params: {
 
     let semanticNotice: string | null = null;
     if (invalidRequestedSense) {
+      semanticNotice = requestedAnySense
+        ? `'${requestedAnySense.rawSense}'은 일반 사전에 문서화된 뜻이지만 현재 작명사전에서 선택 가능 뜻으로 등록되지 않았습니다. 작명 의도로 선택하지 않고 기본 상태를 유지합니다.`
+        : `선택한 의미 ID가 '${rec.hanja}+${hangul}'의 문서화된 의미 목록에 없습니다. 다른 독음의 뜻이나 임의 의미를 결합하지 않습니다.`;
+    } else if (
+      selectionPolicy === 'unknown_unless_selected' &&
+      !requestedSenseId &&
+      selectableSenses.length > 0
+    ) {
       semanticNotice =
-        `선택한 의미 ID가 '${rec.hanja}+${hangul}'의 문서화된 의미 목록에 없습니다. 다른 독음의 뜻이나 임의 의미를 결합하지 않고 기본 제안 뜻으로 되돌렸습니다.`;
-    } else if (requestedSenseId && !requestedSense) {
-      semanticNotice =
-        '선택 요청한 뜻은 작명사전에서 선택 가능하도록 등록된 뜻이 아닙니다. 일반 사전 뜻은 참고만 가능하며 작명 의도로 선택할 수 없습니다.';
+        '작명사전에 선택 가능한 뜻이 있으나 기존 이름의 실제 작명 의도는 확인되지 않았습니다. 사용자가 직접 선택하기 전에는 특정 뜻으로 지었다고 추정하지 않습니다.';
     } else if (!selectedSense && readingSenses.length > 0) {
       semanticNotice =
         '이 한자는 일반 사전 뜻은 확인되지만 현재 작명사전에 선택 가능한 뜻이 등록되어 있지 않습니다. 임의로 좋은 뜻을 만들어 선택하지 않습니다.';
@@ -426,12 +436,14 @@ export function evaluateName(params: {
   const g1Sem = buildGivenSemantics(
     h1Record,
     params.hangul1.trim(),
-    params.selectedSenseId1
+    params.selectedSenseId1,
+    params.meaningSelectionPolicy
   );
   const g2Sem = buildGivenSemantics(
     h2Record,
     params.hangul2.trim(),
-    params.selectedSenseId2
+    params.selectedSenseId2,
+    params.meaningSelectionPolicy
   );
 
   const characters: NameCharacterEvaluation[] = [
@@ -843,11 +855,13 @@ export function recommendNamesWithMeta(
 
   const getMeaningPreferenceScore = (rec: HanjaRecord, reading: string): number => {
     if (preferredMeaningKeywords.length === 0) return 0;
-    const senses = rec.sensesByReading?.[reading] || [];
+    const selectableSenses = (rec.sensesByReading?.[reading] || []).filter(
+      (sense) => sense.recommendedForName === true && Boolean(sense.senseClass)
+    );
     let score = 0;
 
     for (const keyword of preferredMeaningKeywords) {
-      const matched = senses.filter((sense) => {
+      const matched = selectableSenses.filter((sense) => {
         const haystack = [
           sense.rawSense,
           sense.glossCore,
@@ -858,30 +872,16 @@ export function recommendNamesWithMeta(
 
       if (matched.length === 0) continue;
       const best = matched.reduce((bestScore, sense) => {
-        if (
-          sense.senseClass === 'preferred_name_sense' &&
-          sense.recommendedForName !== false
-        ) {
+        if (sense.senseClass === 'preferred_name_sense') {
           return Math.max(bestScore, 24);
         }
-        if (
-          sense.senseClass === 'usable_name_sense' &&
-          sense.recommendedForName !== false
-        ) {
+        if (sense.senseClass === 'usable_name_sense') {
           return Math.max(bestScore, 18);
         }
-        if (
-          sense.senseClass === 'contextual_dictionary_sense' &&
-          sense.recommendedForName !== false
-        ) {
+        if (sense.senseClass === 'contextual_dictionary_sense') {
           return Math.max(bestScore, 8);
         }
-        if (sense.recommendedForName !== false) {
-          return Math.max(bestScore, 12);
-        }
-        // A documented but cautionary sense may still match the user's word.
-        // It is surfaced, not silently treated as a positive naming meaning.
-        return Math.max(bestScore, 2);
+        return Math.max(bestScore, 12);
       }, 0);
       score += best;
     }
