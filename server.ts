@@ -67,7 +67,22 @@ async function startServer() {
         const matchAllMeanings = Object.values(item.meaningByReading).some((arr) =>
           arr.some((m) => m.includes(query))
         );
-        if (!matchChar && !matchReading && !matchMeaning && !matchAllMeanings) return false;
+        const matchSenseLayer = Object.values(item.sensesByReading || {}).some((senses) =>
+          senses.some((sense) =>
+            [sense.rawSense, sense.glossCore, sense.editorialGloss || ''].some((text) =>
+              text.includes(query)
+            )
+          )
+        );
+        if (
+          !matchChar &&
+          !matchReading &&
+          !matchMeaning &&
+          !matchAllMeanings &&
+          !matchSenseLayer
+        ) {
+          return false;
+        }
       }
       return true;
     });
@@ -125,6 +140,8 @@ async function startServer() {
         hanja1: string;
         hangul2: string;
         hanja2: string;
+        selectedSenseId1?: string | null;
+        selectedSenseId2?: string | null;
         saju?: SajuAnalysisResult | null;
       };
       const result = evaluateName(body);
