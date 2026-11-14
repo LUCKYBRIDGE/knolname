@@ -26,6 +26,7 @@ export type MeaningSelectionOrigin =
 
 export interface NameMeaningSelection {
   allSenseIds: string[];
+  selectableSenseIds: string[];
   selectedSenseIds: string[];
   selectionOrigin: MeaningSelectionOrigin;
   namingIntent: string | null;
