@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- public/data/knowledge-base.json; then
+          if [ -z "$(git status --porcelain -- public/data/knowledge-base.json)" ]; then
             echo "Static snapshot already current."
             exit 0
           fi
