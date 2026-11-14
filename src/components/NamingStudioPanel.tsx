@@ -1088,6 +1088,40 @@ export function NamingStudioPanel({
                   )}
                 </div>
 
+                {/* Preferred documented meaning keywords */}
+                <div className="p-3 sm:p-3.5 bg-[#FFF7ED]/55 border border-[#FED7AA] rounded-sm space-y-2.5">
+                  <div>
+                    <label className="text-xs font-semibold text-[#1C1917]">
+                      이름에 담고 싶은 뜻
+                    </label>
+                    <p className="text-[11px] text-[#78716C] mt-0.5 leading-relaxed">
+                      예: 도움, 지혜, 너그러움. 입력한 말은 해당 한자+독음에 실제로 문서화된 뜻과
+                      작명용 편집 풀이에서만 찾아 추천 순위에 반영합니다. 없는 길상 뜻을 새로 만들지 않습니다.
+                    </p>
+                  </div>
+                  <input
+                    type="text"
+                    value={preferredMeaningInput}
+                    onChange={(e) =>
+                      onChangeNamingConfig({ preferredMeaningInput: e.target.value })
+                    }
+                    placeholder="예: 도움, 지혜, 너그러움"
+                    className="w-full min-h-[44px] sm:min-h-[36px] px-3 py-1.5 text-base sm:text-xs border border-[#D6CEBE] rounded-sm bg-white focus:outline-none focus:border-[#9A3412]"
+                  />
+                  {parsedMeaningKeywords.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5">
+                      {parsedMeaningKeywords.map((keyword) => (
+                        <span
+                          key={keyword}
+                          className="inline-flex items-center min-h-[28px] px-2.5 text-[11px] border border-[#FED7AA] bg-white text-[#9A3412] rounded-sm"
+                        >
+                          뜻 · {keyword}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 {/* Criteria checkboxes */}
                 <div className="space-y-1 text-xs text-[#1C1917]">
                   <label className="flex items-center gap-2.5 min-h-[40px] sm:min-h-[28px] cursor-pointer">
