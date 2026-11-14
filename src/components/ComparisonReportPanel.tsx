@@ -10,9 +10,6 @@ interface ComparisonReportPanelProps {
   selectedCandidate: NameEvaluation | null;
   savedCandidates: NameEvaluation[];
   onSelectCandidate: (ev: NameEvaluation) => void;
-  reasonForAnalysis: string;
-  onChangeReasonForAnalysis: (reason: string) => void;
-  customNotes: string;
 }
 
 export function ComparisonReportPanel({
@@ -22,38 +19,9 @@ export function ComparisonReportPanel({
   selectedCandidate,
   savedCandidates,
   onSelectCandidate,
-  reasonForAnalysis,
-  onChangeReasonForAnalysis,
-  customNotes,
 }: ComparisonReportPanelProps) {
 
   const activeCandidate = selectedCandidate || savedCandidates[0] || null;
-
-  if (!activeCandidate) return;
-    setAiLoading(true);
-    setAiError(null);
-    try {
-      const resp = await fetch('/api/naming/interpret', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          appMode,
-          saju: sajuResult,
-          currentName: currentEval,
-          candidateName: activeCandidate,
-          customNotes,
-          reasonForRenaming: reasonForAnalysis,
-        }),
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'AI 해설 요청에 실패했습니다.');
-      setAiText(data.interpretation);
-    } catch (err) {
-      setAiError(err instanceof Error ? err.message : 'AI 해설 중 오류가 발생했습니다.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   if (!activeCandidate) {
     return (
