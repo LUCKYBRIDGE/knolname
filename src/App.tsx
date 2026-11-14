@@ -725,9 +725,6 @@ export default function App() {
                 selectedCandidate={selectedCandidate}
                 savedCandidates={savedCandidates}
                 onSelectCandidate={setSelectedCandidate}
-                reasonForAnalysis={reasonForAnalysis}
-                onChangeReasonForAnalysis={setReasonForAnalysis}
-                customNotes={customNotes}
               />
             )}
 
