@@ -83,6 +83,7 @@ const DEFAULT_NAMING_CONFIG: NamingConfigState = {
   recFixedHanja1: '',
   recFixedHanja2: '',
   preferredInput: '',
+  preferredMeaningInput: '',
   manHangul1: '지',
   manHanja1: '智',
   manHangul2: '우',
