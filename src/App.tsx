@@ -558,7 +558,7 @@ export default function App() {
     },
     {
       id: 'sync',
-      label: '자료 동기화',
+      label: '자료 · 출처',
       mobileLabel: '자료·메모',
       icon: Database,
     },
