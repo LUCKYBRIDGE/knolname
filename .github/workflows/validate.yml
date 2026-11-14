@@ -52,3 +52,4 @@ jobs:
 
           grep -q '"hanjaCount"' /tmp/nolsaju-meta.json
           grep -q '"surnames"' /tmp/nolsaju-meta.json
+          node scripts/semantic-selection-smoke.mjs
