@@ -244,6 +244,8 @@ export function evaluateName(params: {
   hanja1: string;
   hangul2: string;
   hanja2: string;
+  selectedSenseId1?: string | null;
+  selectedSenseId2?: string | null;
   saju?: SajuAnalysisResult | null;
 }): NameEvaluation {
   const kb = getKnowledgeBase();
@@ -304,60 +306,141 @@ export function evaluateName(params: {
   const s1 = getStrokes(h1Record);
   const s2 = getStrokes(h2Record);
 
-  const buildGivenSemantics = (rec: HanjaRecord | null, hangul: string) => {
+  const buildGivenSemantics = (
+    rec: HanjaRecord | null,
+    hangul: string,
+    requestedSenseId?: string | null
+  ) => {
     if (!rec || !hangul) {
       return {
         readingSenses: undefined,
         editorialMeaningGloss: null,
+        meaningSelection: null,
         semanticNotice: null,
         semanticRiskLevel: 'none' as const,
       };
     }
+
+    // Meaning lookup is always scoped to the exact (Hanja + legal reading) relation.
     const readingSenses = rec.sensesByReading?.[hangul];
     if (!readingSenses || readingSenses.length === 0) {
       return {
         readingSenses: undefined,
         editorialMeaningGloss: null,
+        meaningSelection: null,
         semanticNotice: null,
         semanticRiskLevel: 'none' as const,
       };
     }
 
-    const preferredOrUsable = readingSenses.filter((s) => s.recommendedForName !== false && s.senseClass !== 'caution_other_dictionary_sense');
-    const firstCurated = readingSenses.find((s) => s.editorialGloss && s.recommendedForName);
-    const positiveSummary = preferredOrUsable.slice(0, 2).map((s) => s.rawSense).join(' · ');
+    const preferredDefault =
+      readingSenses.find(
+        (s) =>
+          s.senseClass === 'preferred_name_sense' &&
+          s.recommendedForName !== false
+      ) ??
+      readingSenses.find(
+        (s) =>
+          s.senseClass === 'usable_name_sense' &&
+          s.recommendedForName !== false
+      ) ??
+      readingSenses.find(
+        (s) =>
+          s.recommendedForName !== false &&
+          s.senseClass !== 'caution_other_dictionary_sense'
+      ) ??
+      readingSenses[0];
 
-    const mediumCaution = readingSenses.find((s) => s.concernLevel === 'medium' || s.concernLevel === 'high');
-    const lowCaution = readingSenses.find(
-      (s) => s.concernLevel === 'low' || s.senseClass === 'caution_other_dictionary_sense' || s.senseClass === 'contextual_dictionary_sense'
+    const requestedSense = requestedSenseId
+      ? readingSenses.find((s) => s.senseId === requestedSenseId)
+      : undefined;
+
+    const selectedSense = requestedSense ?? preferredDefault;
+    const invalidRequestedSense = Boolean(requestedSenseId && !requestedSense);
+    const selectionOrigin = requestedSense
+      ? ('user_declared' as const)
+      : selectedSense
+      ? ('editorial_default_suggestion' as const)
+      : ('unknown' as const);
+
+    const selectedIsCaution = Boolean(
+      selectedSense &&
+        (selectedSense.recommendedForName === false ||
+          selectedSense.senseClass === 'caution_other_dictionary_sense')
     );
 
-    if (mediumCaution) {
-      return {
-        readingSenses,
-        editorialMeaningGloss: firstCurated?.editorialGloss ?? null,
-        semanticNotice: `다중의미 안내: '${hangul}' 독음 사전 뜻에 '${mediumCaution.rawSense}'도 함께 있습니다. 작명 의도(${positiveSummary || rec.primaryMeaning})와 구분해 참고하세요 (자동 탈락 없음).`,
-        semanticRiskLevel: 'medium' as const,
-      };
+    const otherSenses = readingSenses.filter(
+      (s) => s.senseId !== selectedSense?.senseId
+    );
+    const mediumOrHighOther = otherSenses.find(
+      (s) => s.concernLevel === 'medium' || s.concernLevel === 'high'
+    );
+    const lowOther = otherSenses.find(
+      (s) =>
+        s.concernLevel === 'low' ||
+        s.senseClass === 'caution_other_dictionary_sense' ||
+        s.senseClass === 'contextual_dictionary_sense'
+    );
+
+    const semanticRiskLevel = invalidRequestedSense
+      ? ('invalid' as const)
+      : selectedIsCaution
+      ? ('high' as const)
+      : mediumOrHighOther
+      ? ('medium' as const)
+      : lowOther
+      ? ('low' as const)
+      : ('none' as const);
+
+    const selectedLabel = selectedSense?.rawSense || rec.primaryMeaning;
+    const interpretationText =
+      selectedSense?.editorialGloss || selectedSense?.rawSense || null;
+
+    let semanticNotice: string | null = null;
+    if (invalidRequestedSense) {
+      semanticNotice =
+        `선택한 의미 ID가 '${rec.hanja}+${hangul}'의 문서화된 의미 목록에 없습니다. 다른 독음의 뜻이나 임의 의미를 결합하지 않고 기본 제안 뜻으로 되돌렸습니다.`;
+    } else if (selectedIsCaution && selectedSense) {
+      semanticNotice =
+        `선택 뜻 확인: '${selectedSense.rawSense}'은 문서화된 사전 뜻이지만 대표 작명 뜻으로는 주의가 필요한 의미입니다. 선택 자체를 막지는 않되 다른 뜻과 함께 확인하세요.`;
+    } else if (mediumOrHighOther) {
+      semanticNotice =
+        `다중의미 안내: 이 이름에서는 '${selectedLabel}'을 중심 뜻으로 삼았지만, 같은 '${hangul}' 독음에 '${mediumOrHighOther.rawSense}' 뜻도 함께 문서화되어 있습니다. 선택한 뜻이 글자의 다른 사전 뜻을 없애지는 않습니다.`;
+    } else if (lowOther) {
+      semanticNotice =
+        `다중의미 참고: 이 이름의 중심 뜻은 '${selectedLabel}'이며, 같은 독음에 '${lowOther.rawSense}' 같은 문맥·별개 의미도 함께 있습니다.`;
     }
-    if (lowCaution) {
-      return {
-        readingSenses,
-        editorialMeaningGloss: firstCurated?.editorialGloss ?? null,
-        semanticNotice: `다중의미 참고: 사전 내 문맥·별개 뜻('${lowCaution.rawSense}')도 함께 등재되어 있으나 대표 작명 의미와 직접 충돌하지 않습니다.`,
-        semanticRiskLevel: 'low' as const,
-      };
-    }
+
     return {
       readingSenses,
-      editorialMeaningGloss: firstCurated?.editorialGloss ?? null,
-      semanticNotice: null,
-      semanticRiskLevel: 'none' as const,
+      editorialMeaningGloss: selectedSense?.editorialGloss ?? null,
+      meaningSelection: {
+        allSenseIds: readingSenses.map((s) => s.senseId),
+        selectedSenseIds: selectedSense ? [selectedSense.senseId] : [],
+        selectionOrigin,
+        namingIntent: interpretationText,
+        interpretationText,
+        interpretationStatus: selectedSense?.editorialGloss
+          ? ('editorial_paraphrase_not_dictionary_definition' as const)
+          : null,
+        otherSenseNoticeRequired:
+          semanticRiskLevel !== 'none' || readingSenses.length > 1,
+      },
+      semanticNotice,
+      semanticRiskLevel,
     };
   };
 
-  const g1Sem = buildGivenSemantics(h1Record, params.hangul1.trim());
-  const g2Sem = buildGivenSemantics(h2Record, params.hangul2.trim());
+  const g1Sem = buildGivenSemantics(
+    h1Record,
+    params.hangul1.trim(),
+    params.selectedSenseId1
+  );
+  const g2Sem = buildGivenSemantics(
+    h2Record,
+    params.hangul2.trim(),
+    params.selectedSenseId2
+  );
 
   const characters: NameCharacterEvaluation[] = [
     {
@@ -394,6 +477,7 @@ export function evaluateName(params: {
       legalReadings: h1Record?.legalReadings ?? [],
       readingSenses: g1Sem.readingSenses,
       editorialMeaningGloss: g1Sem.editorialMeaningGloss,
+      meaningSelection: g1Sem.meaningSelection,
       semanticNotice: g1Sem.semanticNotice,
       semanticRiskLevel: g1Sem.semanticRiskLevel,
       tabooWarning: h1Record?.tabooWarning ?? null,
@@ -417,6 +501,7 @@ export function evaluateName(params: {
       legalReadings: h2Record?.legalReadings ?? [],
       readingSenses: g2Sem.readingSenses,
       editorialMeaningGloss: g2Sem.editorialMeaningGloss,
+      meaningSelection: g2Sem.meaningSelection,
       semanticNotice: g2Sem.semanticNotice,
       semanticRiskLevel: g2Sem.semanticRiskLevel,
       tabooWarning: h2Record?.tabooWarning ?? null,
