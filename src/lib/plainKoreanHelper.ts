@@ -146,7 +146,7 @@ export function buildPlainNameSummary(
     const selectedId = char?.meaningSelection?.selectedSenseIds[0];
     const sense = char?.readingSenses?.find((s) => s.senseId === selectedId);
     if (sense) return sense.rawSense;
-    if ((char?.meaningSelection?.selectableSenseIds.length || 0) > 0) {
+    if ((char?.meaningSelection?.selectableSenseIds?.length || 0) > 0) {
       return '작명사전 뜻 미선택';
     }
     return '작명사전 선택 뜻 미구축';
