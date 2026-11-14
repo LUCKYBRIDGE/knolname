@@ -410,10 +410,14 @@ export function NamingStudioPanel({
 
   const getSelectedMeaningLabel = (
     char: NameEvaluation['characters'][number] | undefined
-  ) =>
-    getSelectedSense(char)?.rawSense ||
-    char?.meaning.split(',')[0] ||
-    '의미 확인 필요';
+  ) => {
+    const selected = getSelectedSense(char);
+    if (selected) return selected.rawSense;
+    if ((char?.meaningSelection?.selectableSenseIds.length || 0) > 0) {
+      return '작명 뜻 미선택';
+    }
+    return '작명사전 뜻 미구축';
+  };
 
   const handleSelectMeaning = async (
     role: 'given1' | 'given2',
@@ -1443,8 +1447,8 @@ export function NamingStudioPanel({
                             {hasCaution && (
                               <span className="text-[#9A3412] mr-1">· 뜻 확인</span>
                             )}
-                            {item.characters[1]?.meaning.split(',')[0]} ·{' '}
-                            {item.characters[2]?.meaning.split(',')[0]}
+                            {getSelectedMeaningLabel(item.characters[1])} ·{' '}
+                            {getSelectedMeaningLabel(item.characters[2])}
                           </span>
                           <span className="text-[11px] font-mono tabular-nums text-[#78716C] shrink-0">
                             {item.numerology.grids
@@ -1548,62 +1552,139 @@ export function NamingStudioPanel({
                 </ul>
               </div>
 
-              {/* Multi-Sense Semantic Inspector (per-reading sense breakdown + caution notice) */}
+              {/* Naming-dictionary meaning selector + read-only general dictionary senses */}
               {semanticNoticesForCandidate.length > 0 && (
                 <div className="p-4 bg-[#FBF9F5] border border-[#E7E2D8] rounded-sm space-y-3">
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
-                    <h4 className="text-xs font-semibold text-[#1C1917]">
-                      한자 다중 의미 · 음(音) 기준 작명 뜻풀이
-                    </h4>
+                    <div>
+                      <h4 className="text-xs font-semibold text-[#1C1917]">
+                        작명사전 뜻 선택
+                      </h4>
+                      <p className="text-[11px] text-[#78716C] mt-0.5">
+                        선택 버튼은 LUCKYBRIDGE/name 작명사전에 등록된 뜻만 제공합니다.
+                        일반 사전의 다른 뜻은 참고로만 표시되며 선택할 수 없습니다.
+                      </p>
+                    </div>
                     <span className="text-[11px] text-[#78716C]">
-                      대표 긍정 뜻과 참고용 다중 의미를 구분해 표시합니다
+                      한자 + 실제 독음 기준
                     </span>
                   </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {semanticNoticesForCandidate.map((char) => (
-                      <div
-                        key={`sem-${char.role}-${char.hanja}`}
-                        className="p-3 bg-white border border-[#E7E2D8] rounded-sm space-y-1.5"
-                      >
-                        <div className="flex items-baseline justify-between gap-2">
-                          <span className="font-serif-kr text-sm font-semibold text-[#1C1917]">
-                            {char.hanja} ({char.hangul})
-                          </span>
-                          {char.editorialMeaningGloss && (
-                            <span className="text-[11px] text-[#14532D] font-medium">
-                              권장 뜻: {char.editorialMeaningGloss}
+                    {semanticNoticesForCandidate.map((char) => {
+                      const selectedId = char.meaningSelection?.selectedSenseIds[0] || null;
+                      const selectableIds = new Set(
+                        char.meaningSelection?.selectableSenseIds || []
+                      );
+                      const selectableSenses = (char.readingSenses || []).filter((sense) =>
+                        selectableIds.has(sense.senseId)
+                      );
+                      const referenceOnlySenses = (char.readingSenses || []).filter(
+                        (sense) => !selectableIds.has(sense.senseId)
+                      );
+
+                      return (
+                        <div
+                          key={`sem-${char.role}-${char.hanja}`}
+                          className="p-3 bg-white border border-[#E7E2D8] rounded-sm space-y-3"
+                        >
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="font-serif-kr text-base font-semibold text-[#1C1917]">
+                              {char.hanja} ({char.hangul})
                             </span>
+                            <span className="text-[10px] text-[#78716C]">
+                              {selectableSenses.length > 0
+                                ? `작명사전 ${selectableSenses.length}개 뜻`
+                                : '선택 가능 뜻 미구축'}
+                            </span>
+                          </div>
+
+                          {selectableSenses.length > 0 ? (
+                            <div className="space-y-2">
+                              <div className="text-[11px] font-medium text-[#14532D]">
+                                이름에 담을 뜻 선택
+                              </div>
+                              <div className="space-y-1.5">
+                                {selectableSenses.map((sense) => {
+                                  const active = selectedId === sense.senseId;
+                                  return (
+                                    <button
+                                      key={sense.senseId}
+                                      type="button"
+                                      onClick={() =>
+                                        void handleSelectMeaning(
+                                          char.role as 'given1' | 'given2',
+                                          sense.senseId
+                                        )
+                                      }
+                                      className={`w-full text-left p-2.5 border rounded-sm cursor-pointer transition-colors ${
+                                        active
+                                          ? 'border-[#14532D] bg-[#ECFDF5]'
+                                          : 'border-[#D6CEBE] bg-white hover:bg-[#FBF9F5]'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className={`text-xs font-semibold ${
+                                          active ? 'text-[#14532D]' : 'text-[#1C1917]'
+                                        }`}>
+                                          {sense.rawSense}
+                                        </span>
+                                        <span className="text-[10px] text-[#78716C]">
+                                          {active ? '현재 선택' : '선택'}
+                                        </span>
+                                      </div>
+                                      {sense.editorialGloss && (
+                                        <div className="text-[11px] text-[#57534E] mt-1 leading-relaxed">
+                                          작명 풀이: {sense.editorialGloss}
+                                        </div>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              <div className="text-[10px] text-[#78716C] leading-relaxed">
+                                작명 풀이는 사전 정의 자체가 아니라, 선택한 문서화된 뜻을 바탕으로 한
+                                편집 설명입니다.
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-2.5 bg-[#FEFCE8] border border-[#FDE68A] rounded-sm text-[11px] text-[#78350F] leading-relaxed">
+                              일반 사전 뜻은 확인되지만 현재 작명사전에서 이름 뜻으로 선택할 수 있도록
+                              검토·등록된 뜻이 없습니다. 임의로 길한 의미를 붙이지 않습니다.
+                            </div>
+                          )}
+
+                          {referenceOnlySenses.length > 0 && (
+                            <details className="border-t border-[#E7E2D8] pt-2">
+                              <summary className="text-[11px] text-[#57534E] cursor-pointer">
+                                일반 사전의 다른 뜻 {referenceOnlySenses.length}개 보기
+                              </summary>
+                              <div className="mt-2 space-y-1 text-[11px] text-[#78716C]">
+                                {referenceOnlySenses.map((sense) => (
+                                  <div key={sense.senseId} className="flex items-start gap-1.5">
+                                    <span className="shrink-0">·</span>
+                                    <span>
+                                      {sense.rawSense}
+                                      <span className="ml-1 text-[#A8A29E]">
+                                        (작명 뜻 선택 불가)
+                                      </span>
+                                      {sense.concernNote ? ` · ${sense.concernNote}` : ''}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </details>
+                          )}
+
+                          {char.semanticNotice && (
+                            <div className="pt-1 flex items-start gap-1.5 text-[11px] text-[#9A3412] leading-snug">
+                              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                              <span>{char.semanticNotice}</span>
+                            </div>
                           )}
                         </div>
-                        {char.readingSenses && char.readingSenses.length > 0 && (
-                          <div className="text-[11px] text-[#57534E] leading-relaxed space-y-0.5">
-                            {char.readingSenses.map((sense) => (
-                              <div key={sense.senseId} className="flex items-start gap-1.5">
-                                <span className="font-mono text-[10px] text-[#78716C] shrink-0 mt-0.5">
-                                  #{sense.senseOrder}
-                                </span>
-                                <span
-                                  className={
-                                    sense.concernLevel && sense.concernLevel !== 'none'
-                                      ? 'text-[#9A3412] font-medium'
-                                      : ''
-                                  }
-                                >
-                                  {sense.rawSense}
-                                  {sense.concernNote ? ` (${sense.concernNote})` : ''}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        {char.semanticNotice && (
-                          <div className="pt-1 flex items-start gap-1.5 text-[11px] text-[#9A3412] leading-snug">
-                            <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                            <span>{char.semanticNotice}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
