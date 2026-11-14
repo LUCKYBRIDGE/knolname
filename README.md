@@ -8,8 +8,9 @@
 - 생성형 AI를 사용하지 않습니다.
 - Gemini/OpenAI 등 외부 LLM API 키가 필요하지 않습니다.
 - 사주·이름 분석과 후보 추천은 데이터와 TypeScript 규칙으로 결정적으로 계산합니다.
-- 대규모 작명 DB는 이 저장소에 중복 복사하지 않고 `LUCKYBRIDGE/name`을 단일 원본으로 사용합니다.
-- 서버 시작 시 필요한 데이터 파일을 `data/luckybridge/`에 동기화하며 이 폴더는 Git에 커밋하지 않습니다.
+- `LUCKYBRIDGE/name`을 데이터의 단일 원본으로 유지합니다.
+- 공개 앱은 `name`에서 생성한 `public/data/knowledge-base.json` 정적 스냅샷을 이 저장소에 함께 커밋합니다.
+- 사용자 접속 중에는 GitHub API, Node/Express 서버, 외부 DB를 호출하지 않습니다.
 
 ## 제공 기능
 
@@ -46,41 +47,46 @@
 
 기본 리포트의 설명 문장은 `src/lib/plainKoreanHelper.ts`의 규칙 기반 템플릿으로 생성합니다.
 
-## 데이터 구조
+## 정적 배포 구조
 
 ```text
-LUCKYBRIDGE/name
+LUCKYBRIDGE/name          ← 원본 DB
       │
-      │ 공개 원본 데이터 동기화
+      │ npm run sync:data (관리/배포 시)
       ▼
-server/dataSync.ts
+public/data/knowledge-base.json
       │
       ▼
-data/luckybridge/   (런타임 캐시, Git 제외)
-      │
-      ├─ server/dataLoader.ts
-      ├─ server/sajuEngine.ts
-      └─ server/namingEngine.ts
+src/lib/dataLoader.ts
+      ├─ sajuEngine.ts
+      ├─ namingEngine.ts
+      └─ localApi.ts
               │
               ▼
-          React UI
+          React/Vite
+              │
+              ▼
+   GitHub Pages / Cloudflare Pages
 ```
 
-현재 데이터의 기준은 항상 `LUCKYBRIDGE/name`입니다.
+현재 데이터의 기준은 항상 `LUCKYBRIDGE/name`이며, `knolname`에는 공개 앱 실행에 필요한 정적 스냅샷만 포함합니다.
 
 ## 실행
 
-Node.js 22 이상을 권장합니다.
+개발·빌드에는 Node.js 22 이상을 권장하지만 운영 서버로 Node.js를 사용하지 않습니다.
 
 ```bash
 npm install
 npm run dev
 ```
 
-기본 포트는 `3000`이며 `PORT` 환경변수로 변경할 수 있습니다.
+원본 `name` 데이터가 변경되었을 때만 관리자가 다음 명령으로 앱용 스냅샷을 갱신합니다.
 
-서버 최초 시작 시 `LUCKYBRIDGE/name`에서 필요한 데이터 파일을 내려받습니다.
-이미 데이터가 있으면 재사용하고, 앱의 **자료 동기화** 기능을 실행하면 강제로 최신화합니다.
+```bash
+npm run sync:data
+```
+
+일반 사용자는 배포된 정적 스냅샷을 사용하며 GitHub 원본 저장소를 직접 호출하지 않습니다.
 
 ## 빌드 확인
 
@@ -94,7 +100,7 @@ GitHub Actions에서도 위 검증과 AI 의존성 재유입 검사를 수행합
 ## 개인정보
 
 후보·메모·작업 프로필은 브라우저 `localStorage`에 저장됩니다.
-사주·이름 계산 요청은 놀사주 서버에서 처리되지만 별도의 사용자 데이터베이스에 저장하는 기능은 없습니다.
+사주·이름 계산은 사용자의 브라우저에서 처리되며 생년월일시와 이름 입력을 별도 놀사주 서버로 전송하지 않습니다.
 생성형 AI 서비스로 사용자 입력을 전달하지 않습니다.
 
 ## 데이터·저작권
@@ -106,3 +112,11 @@ GitHub Actions에서도 위 검증과 AI 의존성 재유입 검사를 수행합
 
 사주·성명학은 전통적 해석 체계이며 과학적으로 검증된 미래 예측으로 표현하지 않습니다.
 출생·개명 신고 전 인명용 한자 가능 여부는 대법원 현행 서비스에서 최종 확인해야 합니다.
+
+
+## Cloudflare Pages
+
+- Build command: `npm run build`
+- Build output directory: `dist`
+- 별도 Node 서버/Functions/Workers 불필요
+- 배포 시 `public/data/knowledge-base.json`이 그대로 포함됩니다.
